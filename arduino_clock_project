@@ -1,0 +1,65 @@
+# This sketch uses the Arduino R4 WiFi and a 4 digit 7-segment LED module using a TM1637 chip
+#include <Arduino.h>
+#include <TM1637Display.h>
+#include <NTPClient.h>
+#include <WiFi.h> // for WiFi shield
+#include <WiFiUdp.h>
+
+# The following lines set the WiFi credentials
+const char *ssid     = "TX Beez";
+const char *password = "221Crystal";
+
+// Module connection pins (Digital Pins)
+#define CLK 2
+#define DIO 3
+
+# The next line sets up the 4 digit LED board and creates a new object called "display" that is used later in the code
+TM1637Display display(CLK, DIO);
+# The line sets up the WiFi conntection, creating an object called "ntpUDP" that is used to go out to the internet
+WiFiUDP ntpUDP;
+# The next line sets up the connection to the clock on the internet (called Network Time Protocol). It gets the time from http://ntp.org
+# All time is provided in Universal Time Co-ordinate (UTC) which is basically the time in London, so it has to be adjusted for other places
+# Austin is Central Time Zone which is 21600 seconds later than UTC
+NTPClient timeClient(ntpUDP, "us.pool.ntp.org",-21600 ,0 );
+
+void setup()
+{
+  Serial.begin(115200);
+  # Connect to the internet
+  WiFi.begin(ssid, password);
+  while ( WiFi.status() != WL_CONNECTED ) {
+    delay ( 500 );
+    Serial.print ( "." );
+  }
+  # Connect to the NTP server
+  timeClient.begin();
+  # Set the display brightness in hexidecimal values: minimum (off) is 0x00 and maximum is 0xff
+  display.setBrightness(0x0f);
+}
+
+void loop()
+{
+  # Get the current time
+  timeClient.update(); # This doesn't need to get updated so often. Better code would use the Arduino clock and sync that to the NTP every hour or so
+  // Get hours and minutes
+  int hours = timeClient.getHours();
+  int minutes = timeClient.getMinutes();
+  // Combine hours and minutes into a 4-digit integer
+  int timeCombined = (hours * 100) + minutes;
+  # Show the time on the display with the colon, wait a second, then show it again without the colon
+  updatedisplay(timeCombined,true);
+  delay(1000);
+  updatedisplay(timeCombined,false);
+  delay(1000);
+}
+
+# The following function "updatedisplay" takes two values: an integer "a" and a true or false value "colon" and returns nothing (void)
+# If colon is true it will update the display to include the colon, otherwise it will leave the colon off
+# It will display whatever 4 digit number is provided for "a"
+void updatedisplay(int a, bool colon) {
+  if (colon) {
+    display.showNumberDecEx(a, 0b11100000, false, 4, 0);
+  } else {
+    display.showNumberDecEx(a, 0b10000000, false, 4, 0);
+  }
+}
